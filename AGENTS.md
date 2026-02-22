@@ -2,8 +2,6 @@
 
 This file is the operator-facing index and “rules of the road” for using the agents shipped with this repository.
 
-If you’re new, start with `agents/AGENT_HELP_HUMAN.md` (the human guidance agent). It’s a workflow coach that helps you choose the right next step without violating scope boundaries.
-
 **Naming convention:** use `AGENT_*` when referring to instruction files (e.g., `AGENT_CHANGE.md`); use the role name (e.g., `CHANGE`) when referring to the agent itself. This applies to all agents.
 
 ---
@@ -11,32 +9,41 @@ If you’re new, start with `agents/AGENT_HELP_HUMAN.md` (the human guidance age
 ## 0) Standards & precedence (canonical spec)
 
 - **Canonical standard:** `AGENT_HELPS_HUMANS.md`. Where any other `AGENT_*` file disagrees, **the other file must be edited to conform**.
+- **Decomposition base specification:** `AGENT_DECOMP_BASE.md`. Defines the invariant decomposition protocol (7-gate workflow, abstract entities, ledger/telemetry contract, extension rules) shared by all decomposition agents. Conforming agents: PROJECT_DECOMP, SOFTWARE_DECOMP, DOMAIN_DECOMP.
 - **Required metadata:** every `AGENT_*` instruction file should include the canonical Agent Header Block fields (e.g., `AGENT_CLASS`, `INTERACTION_SURFACE`, `WRITE_SCOPE`, `BLOCKING`, `PRIMARY_OUTPUTS`) and use canonical terminology.
-- **Contract discipline:** Type 1 Managers write briefs and orchestrate; Type 2 Specialists execute bounded briefs and return checkable outputs + evidence; Type 0 defines/maintains contracts.
-- **Auditing:** use `AUDIT_AGENT.md` as the fill-in rubric when adding agents or checking conformance across the suite.
+- **Contract discipline:** Type 0 defines/maintains contracts. Type 1 Managers write briefs and orchestrate; Type 2 Specialists execute bounded briefs and return checkable outputs + evidence.
+- **Auditing:** use `AGENT_AUDIT_AGENTS.md` as the fill-in rubric when adding agents or checking conformance across the suite.
 
 ---
 
 ## 1) The core model (the rules that keep the system coherent)
 
-### Project Decomposition
-- A project that lacks structure cannot be effectively worked on by agents.
-- Project decomposition is what initiates all other agentic workflows.
-- Use **PROJECT_DECOMP** to create a decomposition from a messy Scope of Work (SOW).
-- The project decomposition file is located here:
+### Decomposition
+- Work that lacks structure cannot be effectively worked on by agents.
+- Decomposition is what initiates all other agentic workflows.
+- **Decomposition invariant:** the abstract protocol (intake → normalize → partition → operationalize → verify → publish) is defined in `AGENT_DECOMP_BASE.md`. All decomposition agents conform to it.
+- **Decomposition variants** exist for different domains:
+  - **PROJECT_DECOMP** — EPC / design-build projects (Packages → Deliverables, `PKG-XXX` / `DEL-XXX-YY`)
+  - **SOFTWARE_DECOMP** — software development (Work Domain Packages → agent-executable Deliverables with Context Envelope sizing, `PKG-XX` / `DEL-XX-YY`)
+  - **DOMAIN_DECOMP** — handbook / knowledge domains (Categories → Knowledge Types, `CAT-###` / `KTY-CC-TT`)
+- **How decomposition variants combine:**
+  - **SOFTWARE_DECOMP extends any branch.** If a branch has software to build, SOFTWARE_DECOMP decomposes that software component (including recursively extending other SOFTWARE_DECOMP branches).
+  - **DOMAIN_DECOMP runs parallel to any branch.** It captures the knowledge domain a branch operates within — orthogonal to the work decomposition (including recursively paralleling other DOMAIN_DECOMP branches).
+- The decomposition file is located here:
 
-`run/_Decomposition/ADM_Lloyd_PelletCoolerUpg_ProjectDecomposition_v0_2.md`
+`{EXECUTION_ROOT}/_Decomposition/`
 
 ### Filesystem is the state
-- Project “truth” is what is on disk: folders + `_STATUS.md` + the four documents.
+- Project “truth” is what is on disk: folders + `_STATUS.md` + production documents.
+- Production documents are the four fixed documents (Datasheet, Specification, Guidance, Procedure) for PROJECT/SOFTWARE, or variable Knowledge Artifact files for DOMAIN.
 - Agents must not maintain a hidden database or private state that diverges from the filesystem.
 
-### Deliverables (working-items) are local
-- A **deliverable** (`DEL-xx.yy`) is one folder under `run/{PKG-ID}_{PkgLabel}/1_Working/{DEL-ID}_{DelLabel}/`.
-- Work inside that folder is **local**: no cross-deliverable “crosstalk” by default.
+### Production units (working-items) are local
+- A **production unit** is one folder: a Deliverable (`DEL-XXX-YY`) under `{EXECUTION_ROOT}/{PKG-ID}_{PkgLabel}/1_Working/{DEL-ID}_{DelLabel}/`, or a Knowledge Type (`KTY-CC-TT`) under `{EXECUTION_ROOT}/{CAT-ID}_{CatLabel}/{KTY-ID}_{KTYDesc}/`.
+- Work inside that folder is **local**: no cross-unit “crosstalk” by default.
 
 ### Local lifecycle (not stage gates)
-Deliverables progress through a local lifecycle:
+Production units progress through a local lifecycle:
 
 `OPEN → INITIALIZED → SEMANTIC_READY → IN_PROGRESS → CHECKING → ISSUED`
 
@@ -44,20 +51,11 @@ Deliverables progress through a local lifecycle:
 - **SEMANTIC_READY** indicates `_SEMANTIC.md` exists (semantic lens). If the lens step is skipped, deliverables may move from `INITIALIZED → IN_PROGRESS` directly.
 - `_STATUS.md` is the authoritative lifecycle indicator.
 
-### Coordination representation vs dependency tracking mode
-The framework separates:
-- **Coordination representation**: *how humans coordinate* (Schedule-first | Declared deps | Full graph)
-- **Dependency tracking mode**: *how much dependency data is captured in-file* (`NOT_TRACKED` | `DECLARED` | `FULL_GRAPH`)
-
-Rules of thumb:
-- If `NOT_TRACKED`, do **not** compute or claim “blocked/unblocked” status.
-- If `DECLARED`, only declared interface-critical edges may be used for advisory blocker reporting.
-- If `FULL_GRAPH`, the graph is intended to be complete and acyclic (DAG).
-
-### Cross-deliverable operations are opt-in and human-triggered
-- **RECONCILIATION**: coherence checks across a human-defined scope (read-only deliverables) → writes under `run/_Reconciliation/`.
-- **AGGREGATION**: synthesis/collection across a human-defined scope (read-only inputs by default) → writes under `run/_Aggregation/`.
-- **ESTIMATING**: estimate snapshot generation across a defined scope (read-only deliverables) → writes under `run/_Estimates/`.
+### Cross-unit operations are opt-in and human-triggered
+- **RECONCILIATION**: coherence checks across a human-defined scope (read-only production units) → writes under `execution/_Reconciliation/`. All variants.
+- **AGGREGATION**: synthesis/collection across a human-defined scope (read-only inputs by default) → writes under `execution/_Aggregation/`. All variants.
+- **ESTIMATING**: estimate snapshot generation across a defined scope (read-only production units) → writes under `execution/_Estimates/`. PROJECT/SOFTWARE only. Runs are parameterized by `BASIS_OF_ESTIMATE` (QUOTE | RATE_TABLE | HISTORICAL | PARAMETRIC | ALLOWANCE). No agent-authored BOE is required by default.
+- **SCHEDULING**: parameterized schedule generation from the dependency graph (read-only production units) → writes under `execution/_Schedule/`. PROJECT/SOFTWARE only. Supports PRECEDENCE, CONSTRAINT, or HYBRID scheduling basis.
 
 ---
 
@@ -71,7 +69,7 @@ Agents are classified by how they interact, what they write, and whether they ca
 |----------|--------|---------|
 | **AGENT_CLASS** | `PERSONA` / `TASK` | Persona agents run interactive sessions; Task agents run pipelines |
 | **INTERACTION_SURFACE** | `chat` / `INIT-TASK` / `spawned` / `both` | How the agent is invoked |
-| **WRITE_SCOPE** | `project-level` / `tool-root-only` / `deliverable-local` / `none` | What the agent is allowed to write |
+| **WRITE_SCOPE** | `repo-wide` / `project-level` / `tool-root-only` / `deliverable-local` / `repo-metadata-only` / `none` | What the agent is allowed to write |
 | **BLOCKING** | `allowed` / `never` | Whether the agent may pause for human input |
 
 Each agent instruction file also declares **AGENT_TYPE**:
@@ -82,133 +80,97 @@ Each agent instruction file also declares **AGENT_TYPE**:
 ### Full Agent Type Table
 
 | Agent | CLASS | INTERACTION | PRIMARY_OUTPUTS |
-|-------|-------|-------------|-------------|----------|-----------------|
-| **PROJECT_DECOMP** | PERSONA | chat | Decomposition document |
-| **ORCHESTRATOR** | PERSONA | chat | `_COORDINATION.md`; spawns sub-agents |
-| **PROJECT_CONTROLS** | PERSONA | chat | Project controls register, decision capture, run plans |
-| **WORKING_ITEMS** | PERSONA | chat | User defined output |
+| --- | --- | --- | --- |
+| **4_DOCUMENTS** | TASK | spawned | 4 docs, `_STATUS.md` (OPEN→INITIALIZED) |
+| **AGGREGATION** | TASK | spawned | Snapshots in `_Aggregation/` |
+| **AUDIT_AGENTS** | TASK | spawned | Agent state report |
+| **AUDIT_DECOMP** | TASK | spawned | `Decomp-Coverage_Report.md`, `Decomp-Coverage_IssueLog.csv`, `Decomp-Coverage_Matrix.csv`, and `coverage_summary.json` |
+| **AUDIT_DEP_CLOSURE** | TASK | spawned | Dependencies state report |
+| **CHANGE** | PERSONA | chat | Git state report; optional git actions after explicit approval |
+| **CHIRALITY_FRAMEWORK** | TASK | spawned | `_SEMANTIC.md`, `_STATUS.md` |
+| **CHIRALITY_LENS** | TASK | spawned | `_SEMANTIC_LENSING.md` |
+| **CONTEXT_TRANSPOSE** | PERSONA | chat | CTSP snapshot; patch plan; optional applied patch; QA report |
+| **DECOMP_BASE** | PERSONA | chat | Decomposition base specification; defines the invariant protocol for conforming agents (PROJECT_DECOMP, SOFTWARE_DECOMP, DOMAIN_DECOMP) |
+| **DEPENDENCIES** | TASK | spawned | `_DEPENDENCIES.md`, `Dependencies.csv` |
+| **DOMAIN_DECOMP** | PERSONA | chat | Domain decomposition document (conforms to DECOMP_BASE) |
+| **ESTIMATE_PREP** | TASK | INIT-TASK | Pricing CSVs, `INDEX.md`, BOE scaffold or full `BASIS_OF_ESTIMATE.md`, QA/provenance logs |
+| **ESTIMATING** | TASK | spawned | Estimate snapshots in `_Estimates/` |
 | **HELP_HUMAN** | PERSONA | chat | Briefs, checklists, interpretations, next-step recommendations |
 | **HELPS_HUMANS** | PERSONA | chat | Workflow design standards; agent instruction maintenance guidance |
+| **ORCHESTRATOR** | PERSONA | chat | `_COORDINATION.md`; spawns sub-agents |
 | **PREPARATION** | TASK | spawned | Folders, metadata files |
-| **4_DOCUMENTS** | TASK | spawned | 4 docs, `_STATUS.md` (OPEN→INITIALIZED) |
-| **CHIRALITY_FRAMEWORK** | TASK | spawned | `_SEMANTIC.md`, `_STATUS.md` |
-| **DEPENDENCIES** | TASK | spawned | `_DEPENDENCIES.md`, `Dependencies.csv` |
-| **AGGREGATION** | TASK | spawned | Snapshots in `_Aggregation/` |
+| **PROJECT_DECOMP** | PERSONA | chat | Decomposition document (conforms to DECOMP_BASE) |
 | **RECONCILIATION** | PERSONA | chat | Reports in `_Reconciliation/` |
-| **ESTIMATING** | TASK | spawned | Estimate snapshots in `_Estimates/` |
-| **CHANGE** | PERSONA | chat | Git state report; optional git actions after explicit approval |
+| **REVIEW** | PERSONA | chat | Review checklist, finding register, review summary, lifecycle transition record |
+| **SCHEDULING** | PERSONA | chat | Schedule structure, duration model, Gantt (Mermaid + CSV), critical path / risk report in `_Schedule/` — parameterized by `BASIS_OF_SCHEDULE` (PRECEDENCE / CONSTRAINT / HYBRID) |
+| **SCOPE_CHANGE** | PERSONA | chat | Amended decomposition, updated `_CONTEXT.md` files, impact assessment, propagation record |
+| **SOFTWARE_DECOMP** | PERSONA | chat | Software decomposition document with Context Envelope sizing (conforms to DECOMP_BASE) |
+| **TASK** | TASK | INIT-TASK | Proposals; optional edits to authorized deliverable-local files |
+| **WORKING_ITEMS** | PERSONA | chat | User defined output |
 
-
-### When to use which class
-
-**Persona agents** — Use when you need an interactive session:
-- `PROJECT_DECOMP`: Starting a new project from a messy SOW
-- `HELP_HUMAP`: Need help choosing the right next step
-- `ORCHESTRATOR`: Initializing workspace, scanning status, spawning sub-agents
-- `PROJECT_CONTROLS`: Interactive control plane; invokes Type 2 pipelines
-- `WORKING_ITEMS`: Production work on a specific deliverable (human-in-the-loop)
-- `HELPS_HUMANS`: Workflow design standard for writing/maintaining agent instructions
-
-**Task agents** — Use for pipeline work 
-- `PREPARATION`: Scaffolding folders and metadata
-- `4_DOCUMENTS`: Generating initial drafts
-- `CHIRALITY_FRAMEWORK`: Generating semantic lenses 
-- `DEPENDENCIES`: Discovering dependencies from content 
-- `AGGREGATION`: Cross-file rollups and synthesis 
-- `RECONCILIATION`: Cross-deliverable or intra-agent coherence checks 
-- `ESTIMATING`: Cost estimate snapshots
-- `CHANGE`: Git state review and optional actions with explicit approval
 
 ---
 
-## 3) Agent index (what each one is for)
+## 3) The Agent Matrix
 
-### PROJECT_DECOMP (Project Decomposition)
-- **What it does:** Transforms a messy, user-supplied Scope of Work (SOW) into a structured scope output (SSOW), then decomposes SSOW into flat Packages, Deliverables, and anticipated Artifacts. Runs a conversational, gate-controlled process with the user.
-- **What it does not do:** Produce engineering content; skip confirmation gates; resolve ambiguities silently; approve its own output.
+The Agent Matrix organizes the agent suite along two axes derived from Matrix A of the chirality semantic framework:
 
-File: `agents/AGENT_PROJECT_DECOMP.md`
+- **Rows** describe the agent's epistemic posture: NORMATIVE (standards/direction), OPERATIVE (execution/production), EVALUATIVE (assessment/quality)
+- **Columns** describe the agent's functional role: GUIDING (orientation), APPLYING (execution), JUDGING (decision), REVIEWING (audit/feedback)
 
-### HELP_HUMAN (Human Support Persona)
-- **What it does:** Helps the human choose the correct next step and avoid framework misuse.
-- **What it does not do:** Draft engineering content; change `_STATUS.md`; scan cross-deliverable scope unless explicitly asked to run reconciliation.
+| | **GUIDING** | **APPLYING** | **JUDGING** | **REVIEWING** |
+| :--- | :--- | :--- | :--- | :--- |
+| **NORMATIVE** | HELP | ORCHESTRATE | WORKING_ITEMS | AGGREGATE |
+| **OPERATIVE** | DECOMP\* | PREP\* | TASK\* | AUDIT\* |
+| **EVALUATIVE** | AGENTS | DEPENDENCIES | CHANGE | RECONCILING |
 
-File: `agents/AGENT_HELP_HUMAN.md`
+**Note:** "AGENTS" in the EVALUATIVE/GUIDING cell refers to `AGENT_HELPS_HUMANS` — the Type 0 canonical standard agent used to build and maintain all other agents.
 
-### ORCHESTRATOR (Workspace + visibility)
-- **What it does:** Ingests the decomposition; records coordination representation + dependency mode; spawns bounded sub-agents; scans/reports status.
-- **What it does not do:** Produce engineering content; assign work; decide stage gates or sequencing.
+### UI page routing
 
-File: `agents/AGENT_ORCHESTRATOR.md`
+Each row maps to a UI surface:
 
-### PROJECT_CONTROLS (Interactive control plane)
-- **What it does:** Maintains project control intent, orchestrates Type 2 pipelines, and records decisions/run plans.
-- **What it does not do:** Draft engineering content; resolve semantic conflicts; modify deliverable artifacts directly.
+| Row | Page | Interaction model |
+|-----|------|-------------------|
+| **NORMATIVE** | WORKBENCH | Interactive persona sessions with agent selection |
+| **OPERATIVE** | PIPELINE | Pipeline execution with category dropdown menus |
+| **EVALUATIVE** | WORKBENCH | Interactive persona sessions with agent selection |
 
-File: `agents/AGENT_PROJECT_CONTROLS.md`
+### OPERATIVE category breakdown (PIPELINE dropdown menus)
 
-### HELPS_HUMANS (Workflow Design Standard)
-- **What it does:** Defines standards for designing agentic workflows and writing/maintaining agent instruction sets.
-- **What it does not do:** Produce engineering deliverable content; execute project work.
+The OPERATIVE row contains composite categories (marked with `*`). Each expands into a dropdown menu on the PIPELINE page:
 
-File: `agents/AGENT_HELPS_HUMANS.md`
+**DECOMP**
+- SOFTWARE
+- PROJECT
+- DOMAIN
+- BASE (create new)
 
-### PREPARATION (Scaffolding)
-- **What it does:** Creates package/deliverable folders and writes the minimum viable fileset (`_CONTEXT.md`, `_DEPENDENCIES.md`, `_STATUS.md`, `_REFERENCES.md`) idempotently.
-- **What it does not do:** Write engineering requirements/specs; infer dependencies.
+**PREP**
+- PREPARATION
+- 4_DOCUMENTS
+- CHIRALITY_FRAMEWORK
+- CHIRALITY_LENS
 
-File: `agents/AGENT_PREPARATION.md`
+**TASK**
+- SCOPE_CHANGE
+- SCOPE_PREP
+- ESTIMATE_PREP
+- AUDIT_PREP
+- SCHEDULE_PREP
+- ESTIMATING
+- SCHEDULING
+- "all deliverables" (for software development or project execution)
+- "all knowledge types" (for domain knowledge curation)
 
-### 4_DOCUMENTS (Initialize drafts)
-- **What it does:** Generates initial drafts of `Datasheet.md`, `Specification.md`, `Guidance.md`, `Procedure.md` for one deliverable.
-- **Status rule:** May set `_STATUS.md` from `OPEN → INITIALIZED` **only if the current state is `OPEN`** (no regression).
-- **Epistemic rule:** No invention; cite what you can; otherwise mark TBD / ASSUMPTION.
-
-File: `agents/AGENT_4_DOCUMENTS.md`
-
-### CHIRALITY_FRAMEWORK (Semantic Lens / Matrices)
-- **What it does:** Generates deliverable-specific semantic matrices after drafts exist; writes/overwrites `_SEMANTIC.md`; may advance `_STATUS.md` from `INITIALIZED → SEMANTIC_READY` (only when current state is `INITIALIZED`).
-- **What it does not do:** Invent requirements/parameters; modify the four documents; enforce the matrices as constraints (they are a lens, not authority).
-
-File: `agents/AGENT_CHIRALITY_FRAMEWORK.md`
-
-### WORKING_ITEMS (Human-in-the-loop production)
-- **What it does:** Runs a working session for **one** deliverable folder to iteratively produce a coherent set of all four documents.
-- **Core rule:** The human engineer is the validator / halting condition.
-
-File: `agents/AGENT_WORKING_ITEMS.md`
-
-### RECONCILIATION (Cross-deliverable and intra-agent dependency checks)
-- **What it does:** Read-only scan across the dependency mapping between deliverables and compares to current state of `4 Documents` for coherence and consistency. Or runs the AUDIT_AGENT.md protocol.
-- **What it does not do:** Modify deliverables; resolve conflicts without human rulings.
-
-File: `agents/AGENT_RECONCILIATION.md`
-
-### AGGREGATION (Project-level synthesis across files)
-- **What it does:** Aggregates across any human-defined scope (deliverables, packages, tool roots) and writes a timestamped snapshot under `run/_Aggregation/` (does not edit inputs).
-- **What it does not do:** Modify source files; silently expand scope; overwrite prior snapshots (except `_LATEST.md` pointer).
-
-File: `agents/AGENT_AGGREGATION.md`
-
-### ESTIMATING (Project cost estimate snapshots)
-- **What it does:** Produces an estimate snapshot under `run/_Estimates/` including `Detail.csv` line items with **Qty, Unit, UnitRate**, plus Summary and `BOE.md` (Basis of Estimate).
-- **What it does not do:** Edit deliverable folders; produce binding quotes; require mid-run human decisions (it can log decisions and proceed).
-
-File: `agents/AGENT_ESTIMATING.md`
-
-### DEPENDENCIES (Emergent dependency discovery)
-- **What it does:** Identifies emergent dependencies stated or implied within the four deliverable documents and records them in a machine-trackable register (`Dependencies.csv`) for project-level synthesis by AGGREGATION.
-- **What it does not do:** Create engineering content; modify the four documents; invent target IDs without evidence.
-
-File: `agents/AGENT_DEPENDENCIES.md`
-
-### CHANGE (Diff • Interpret • Recommend • Execute with Approval)
-- **What it does:** Inspects git state, summarizes changes, and optionally executes git actions after explicit approval. Creates output in `_DEPENDENCIES.md` per deliverable.
-- **What it does not do:** Change repo state without approval; perform destructive actions without heightened approval.
-
-File: `agents/AGENT_CHANGE.md`
+**AUDIT**
+- AGENTS
+- DEPENDENCIES
+- ESTIMATES
+- REFERENCES
+- SCHEDULES
+- SCOPE
 
 ---
-
 
 EOF

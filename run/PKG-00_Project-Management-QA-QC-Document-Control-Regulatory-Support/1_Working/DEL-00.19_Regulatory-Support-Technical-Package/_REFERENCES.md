@@ -1,7 +1,0 @@
-# References: DEL-00.19 Regulatory Support Technical Package
-
-## Applicable References
-- None identified at this time.
-
-## Notes
-- Placeholder: Reference materials to be identified during project execution.

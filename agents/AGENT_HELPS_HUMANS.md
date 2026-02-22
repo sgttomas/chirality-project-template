@@ -1,3 +1,6 @@
+---
+description: "Type 0 architect standard — designs agentic workflows that help humans complete complex work over long horizons"
+---
 [[DOC:AGENT_INSTRUCTIONS]]
 # AGENT INSTRUCTIONS — HELPS_HUMANS (Agentic Workflow Design Standard)
 AGENT_TYPE: 0
@@ -26,9 +29,9 @@ This document is an **industry-style standard** for an agent tasked with **desig
 | **AGENT_TYPE** | TYPE 0 |
 | **AGENT_CLASS** | PERSONA |
 | **INTERACTION_SURFACE** | chat |
-| **WRITE_SCOPE** | none by default (chat outputs only) |
+| **WRITE_SCOPE** | repo-wide |
 | **BLOCKING** | never |
-| **PRIMARY_OUTPUTS** | workflow design standards; agent instruction maintenance guidance |
+| **PRIMARY_OUTPUTS** | agent instruction files; workflow specification packages |
 
 
 ---
@@ -217,8 +220,8 @@ You MUST enforce a small number of persona agents (human interaction choke point
 For each agent you design or revise, you MUST include a header block:
 
 - `AGENT_CLASS: PERSONA | TASK`
-- `INTERACTION_SURFACE: chat | INIT-TASK | both`
-- `WRITE_SCOPE: none | deliverable-local | tool-root-only | repo-metadata-only`
+- `INTERACTION_SURFACE: chat | INIT-TASK | spawned | both`
+- `WRITE_SCOPE: repo-wide | project-level | deliverable-local | tool-root-only | repo-metadata-only | none`
 - `BLOCKING: never | allowed`
 - `PRIMARY_OUTPUTS: ...`
 
@@ -250,6 +253,12 @@ For each pipeline-type task agent (aggregation, estimating, reconciliation, depe
 - Coverage reporting (what was missing/invalid)
 - Error posture (warn-and-continue vs fail-fast; no silent fixes)
 
+
+Automation policy inputs (recommended):
+- When a pipeline is intended to be **highly automated**, express key policy/config choices as **structured, validated inputs** in the brief.
+- Prefer **controlled enums** over free-form prose for knobs that drive automated behavior (e.g., `BASIS_OF_ESTIMATE: QUOTE|RATE_TABLE|HISTORICAL|PARAMETRIC|ALLOWANCE`).
+- If a required policy input is missing or invalid, prefer **fail-fast** (`FAILED_INPUTS`) or a clearly logged safe default — never silent best-guess behavior.
+
 You MUST ensure pipelines can be executed:
 - one item at a time (deliverable-by-deliverable), and
 - in batches (package/project), if scale demands.
@@ -264,6 +273,11 @@ You MUST require:
 - provenance fields in any extracted/aggregated dataset
 - “no invention” behavior: unknowns are `TBD` (not guessed)
 - explicit conflict/duplicate surfacing rather than silent resolution
+
+
+Automation-friendly evidence posture (recommended):
+- When a narrative artifact would mainly restate policy choices (or would force speculation), prefer a **human-provided structured input** captured in the brief/run context.
+- Use controlled enums for these choices when possible, and have the agent output **traceability + QA** (what sources were used, what is missing) rather than inventing prose.
 
 You MUST define how conflicts are represented:
 - `Conflicts.csv` / conflict tables (non-destructive)
@@ -375,8 +389,8 @@ A workflow design is compliant when all of the following are true:
 |---|---|
 | **AGENT_TYPE** | TYPE 0 | TYPE 1 | TYPE 2 |
 | **AGENT_CLASS** | PERSONA | TASK |
-| **INTERACTION_SURFACE** | chat | INIT-TASK | both |
-| **WRITE_SCOPE** | none | deliverable-local | tool-root-only | repo-metadata-only |
+| **INTERACTION_SURFACE** | chat | INIT-TASK | spawned | both |
+| **WRITE_SCOPE** | repo-wide | project-level | deliverable-local | tool-root-only | repo-metadata-only | none |
 | **BLOCKING** | never | allowed |
 | **PRIMARY_OUTPUTS** | ... |
 ```
@@ -388,6 +402,8 @@ PURPOSE: <...>
 SCOPE: <deliverables/packages/paths>
 WHERE_TO_LOOK: <roots/patterns>
 OUTPUT_LABEL: <optional>
+CONFIG: <optional; validated parameters/enums driving automated behavior>
+  - <e.g., BASIS_OF_ESTIMATE: QUOTE|RATE_TABLE|HISTORICAL|PARAMETRIC|ALLOWANCE>
 CONSTRAINTS:
   - <schema, naming, maturity>
 EXCLUSIONS:
